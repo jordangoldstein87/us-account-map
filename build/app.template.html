@@ -1,0 +1,1214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Atlas USA</title>
+__D3_LIBS__
+<style>
+  :root{
+    --bg:#0c0f14;
+    --ocean:#0a0d12;
+    --panel:#12171f;
+    --raised:#19202b;
+    --line:#222b39;
+    --line-2:#2e394b;
+    --text:#e9eef6;
+    --dim:#94a1b6;
+    --faint:#5f6c80;
+    --green:#2ec46b;
+    --green-bright:#46e285;
+    --yellow:#f5b94a;
+    --red:#b3494f;
+    --red-soft:#8a3b40;
+    --accent:#f5b94a;
+    --nodata:#283142;
+    --display:"Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --body:"Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--text);font-family:var(--body);
+    font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;overflow:hidden;
+  }
+  .app{display:flex;flex-direction:column;height:100vh;width:100vw}
+
+  /* ---------- header ---------- */
+  .topbar{
+    display:flex;align-items:center;gap:16px;padding:11px 18px;
+    border-bottom:1px solid var(--line);background:linear-gradient(180deg,#10151d,#0c0f14);
+    flex:0 0 auto;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:baseline;gap:9px;white-space:nowrap}
+  .brand .mark{
+    font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+  .brand .mark .a{color:var(--green-bright)}
+  .brand .tag{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.14em;text-transform:uppercase}
+
+  /* segmented toggles (brand / metric / type) */
+  .seg{display:inline-flex;background:var(--raised);border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+  .seg .lbl{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
+    display:flex;align-items:center;padding:0 9px;border-right:1px solid var(--line)}
+  .seg button{background:none;border:none;color:var(--dim);padding:7px 11px;cursor:pointer;font-family:var(--body);
+    font-size:12.5px;font-weight:600;border-right:1px solid var(--line);white-space:nowrap}
+  .seg button:last-child{border-right:none}
+  .seg button:hover{background:#222c3b;color:var(--text)}
+  .seg button.on{background:var(--green);color:#06140b}
+  .seg.metric button.on{background:var(--accent);color:#1c1405}
+
+  .search{position:relative;flex:0 1 220px;min-width:150px}
+  .search input{
+    width:100%;background:var(--raised);border:1px solid var(--line-2);color:var(--text);
+    border-radius:8px;padding:8px 11px 8px 32px;font-family:var(--body);font-size:13px;outline:none;
+  }
+  .search input:focus{border-color:var(--accent)}
+  .search .ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:13px}
+  .results{
+    position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--raised);
+    border:1px solid var(--line-2);border-radius:8px;max-height:260px;overflow:auto;z-index:40;
+    box-shadow:0 14px 40px rgba(0,0,0,.5);display:none;
+  }
+  .results.open{display:block}
+  .results button{
+    display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;
+    background:none;border:none;color:var(--text);padding:8px 11px;cursor:pointer;font-size:13px;
+    font-family:var(--body);border-bottom:1px solid var(--line);
+  }
+  .results button:last-child{border-bottom:none}
+  .results button:hover{background:#222c3b}
+  .results .cov{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .results .cov.yes{color:var(--green-bright)}
+
+  .stats{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+  .chip{
+    display:flex;flex-direction:column;align-items:flex-end;
+    background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:5px 11px;min-width:62px;
+  }
+  .chip .n{font-family:var(--mono);font-size:16px;font-weight:600;line-height:1}
+  .chip .l{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-top:3px}
+  .chip.green .n{color:var(--green-bright)}
+  .chip.amber .n{color:var(--accent)}
+  .chip.pen .n{color:#5fd0c8}
+  .chip.t .n{color:var(--text);font-size:14px}
+
+  /* ---------- body split ---------- */
+  .main{display:flex;flex:1 1 auto;min-height:0}
+  .mapwrap{position:relative;flex:1 1 auto;min-width:0;background:
+    radial-gradient(120% 120% at 50% 0%, #0e131b 0%, var(--ocean) 70%);}
+  svg.map{width:100%;height:100%;display:block;cursor:grab}
+  svg.map.dragging{cursor:grabbing}
+  .state{stroke:var(--ocean);stroke-width:.5px;vector-effect:non-scaling-stroke;
+    transition:fill .15s ease;fill:var(--nodata);cursor:pointer}
+  .state:hover{filter:brightness(1.22)}
+  .state.sel{stroke:var(--accent);stroke-width:1.8px}
+  .state-bg{fill:none;stroke:#16202d;stroke-width:.5px}
+  .slabel{
+    fill:#eef4fc;font-family:var(--body);font-weight:600;font-size:10px;text-anchor:middle;
+    paint-order:stroke;stroke:rgba(6,9,13,.85);stroke-width:2px;stroke-linejoin:round;
+    vector-effect:non-scaling-stroke;pointer-events:none;user-select:none;
+  }
+  .slabel.sel{fill:var(--accent);font-weight:700}
+  .slabel .val{font-size:0.8em;fill:#cfd8e6;font-weight:600}
+  .slabel.sel .val{fill:var(--accent)}
+  .pin{fill:#6fd3ff;stroke:#0a0d12;stroke-width:.6px;vector-effect:non-scaling-stroke;pointer-events:none}
+
+  .zoomctl{position:absolute;left:14px;bottom:14px;display:flex;flex-direction:column;
+    background:var(--raised);border:1px solid var(--line-2);border-radius:9px;overflow:hidden}
+  .zoomctl button{background:none;border:none;color:var(--dim);width:34px;height:32px;cursor:pointer;
+    font-size:16px;font-family:var(--mono);border-bottom:1px solid var(--line)}
+  .zoomctl button:last-child{border-bottom:none}
+  .zoomctl button:hover{background:#222c3b;color:var(--text)}
+
+  .legend{position:absolute;right:14px;bottom:14px;
+    background:rgba(13,17,23,.85);border:1px solid var(--line);border-radius:9px;padding:9px 12px;
+    backdrop-filter:blur(6px);font-size:11px;min-width:188px}
+  .legend .lg-title{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--faint);margin-bottom:7px}
+  .legend .lg-bar{height:11px;border-radius:4px;
+    background:linear-gradient(90deg,var(--red),var(--yellow),var(--green))}
+  .legend .lg-scale{display:flex;justify-content:space-between;margin-top:5px;color:var(--dim);
+    font-family:var(--mono);font-size:10px}
+  .legend .lg-nodata{display:flex;align-items:center;gap:6px;margin-top:7px;color:var(--faint);font-size:10.5px}
+  .legend .lg-nodata .sw{width:11px;height:11px;border-radius:3px;background:var(--nodata)}
+
+  /* tooltip */
+  .tip{position:fixed;pointer-events:none;z-index:60;max-width:250px;
+    background:#0e141d;border:1px solid var(--line-2);border-radius:10px;padding:10px 12px;
+    box-shadow:0 16px 44px rgba(0,0,0,.6);opacity:0;transition:opacity .1s;}
+  .tip.show{opacity:1}
+  .tip .tname{font-family:var(--display);font-weight:600;font-size:14px;margin-bottom:5px}
+  .tip .trow{display:flex;justify-content:space-between;gap:14px;font-size:12.5px;margin-top:2px}
+  .tip .trow .k{color:var(--dim)} .tip .trow .v{font-family:var(--mono);color:var(--text)}
+  .tip .tbreak{margin-top:7px;padding-top:6px;border-top:1px solid var(--line);
+    font-size:11.5px;color:var(--faint);font-family:var(--mono)}
+
+  /* ---------- side panel ---------- */
+  .panel{flex:0 0 354px;border-left:1px solid var(--line);background:var(--panel);
+    display:flex;flex-direction:column;min-height:0}
+  .panel .head{padding:16px 18px 14px;border-bottom:1px solid var(--line)}
+  .panel .state-name{font-family:var(--display);font-weight:600;font-size:21px;line-height:1.15;margin:0}
+  .cov-badge{display:inline-flex;align-items:center;gap:6px;margin-top:9px;font-size:11px;
+    font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:6px;border:1px solid}
+  .cov-badge.yes{color:var(--green-bright);border-color:#1f5a36;background:#102018}
+  .cov-badge.no{color:var(--red);border-color:#5a2a2d;background:#1c1012}
+  .cov-badge.mid{color:var(--accent);border-color:#4a4126;background:#171206}
+
+  .panel .scroll{flex:1 1 auto;overflow:auto;padding:16px 18px}
+  .sec-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
+    font-family:var(--mono);margin:2px 0 8px}
+  .panel-empty{color:var(--faint);font-size:13px;margin:0 0 16px}
+
+  .pen-block{margin:0 0 18px}
+  .pen-row{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+  .pen-row .pr-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .pen-row .pr-label{font-size:12.5px;color:var(--text)}
+  .pen-row .pr-val{font-family:var(--mono);font-size:12px;color:var(--dim);white-space:nowrap}
+  .pen-row .pr-val b{color:var(--green-bright);font-weight:600}
+  .pen-row .pr-bar{height:7px;border-radius:4px;background:var(--raised);overflow:hidden;border:1px solid var(--line)}
+  .pen-row .pr-fill{height:100%;border-radius:4px;background:var(--green)}
+  .pen-row.overall .pr-label{font-weight:600}
+  .pen-row.overall{margin-top:4px;padding-top:12px;border-top:1px solid var(--line)}
+
+  .tally{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+    margin:0 0 16px;padding:11px 13px;background:var(--raised);border:1px solid var(--line-2);border-radius:9px}
+  .tally .rt-label{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+  .tally .rt-val{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--green-bright);white-space:nowrap}
+
+  .acct-filter{position:relative;margin:0 0 10px}
+  .acct-filter input{width:100%;background:var(--raised);border:1px solid var(--line-2);color:var(--text);
+    border-radius:8px;padding:7px 11px 7px 30px;font-family:var(--body);font-size:12.5px;outline:none}
+  .acct-filter input:focus{border-color:var(--accent)}
+  .acct-filter .ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:12px}
+
+  .acct-list{display:flex;flex-direction:column;gap:8px;margin:0 0 4px}
+  .acct{display:flex;gap:10px;align-items:flex-start;background:var(--raised);
+    border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+  .acct .a-main{flex:1 1 auto;min-width:0}
+  .acct .a-name{font-weight:600;font-size:13.5px;word-break:break-word}
+  .acct .a-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+  .tag-chip{font-family:var(--mono);font-size:10px;line-height:1.4;color:var(--dim);
+    background:#0e141d;border:1px solid var(--line-2);border-radius:5px;padding:1px 6px;white-space:nowrap}
+  .tag-chip.type{color:var(--accent);border-color:#4a4126;background:#171206}
+  .tag-chip.gpen{color:#9be29b;border-color:#1f5a36;background:#0d1c14}
+  .tag-chip.stund{color:#c79bf2;border-color:#473066;background:#160f22}
+  .acct .a-loc{font-size:11.5px;color:var(--faint);font-family:var(--mono);margin-top:4px;word-break:break-word}
+  .acct .a-note{font-size:12px;color:var(--dim);margin-top:4px;word-break:break-word}
+
+  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;height:100%;color:var(--faint);padding:30px;gap:10px}
+  .empty-state .big{font-size:34px;opacity:.55}
+  .empty-state h3{font-family:var(--display);color:var(--dim);font-weight:600;margin:0;font-size:16px}
+  .empty-state p{margin:0;font-size:13px;max-width:230px}
+
+  .panel .foot{flex:0 0 auto;border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-wrap:wrap;gap:8px}
+  .panel .foot .btn{flex:1 1 calc(50% - 4px);text-align:center;padding:9px 8px;font-size:12.5px}
+  .src-status{flex:1 1 100%;font-family:var(--mono);font-size:11px;letter-spacing:.02em;
+    color:var(--faint);padding:2px 2px 0;line-height:1.5}
+  .src-status.ok{color:var(--green-bright)} .src-status.loading{color:var(--accent)} .src-status.err{color:var(--red)}
+  .src-status .warnlink{color:var(--accent);cursor:pointer;text-decoration:underline}
+
+  .btn{border:none;border-radius:8px;padding:9px 14px;font-family:var(--body);font-weight:600;
+    font-size:13px;cursor:pointer}
+  .btn.primary{background:var(--green);color:#06140b}
+  .btn.primary:hover{background:var(--green-bright)}
+  .btn.ghost{background:var(--raised);color:var(--text);border:1px solid var(--line-2)}
+  .btn.ghost:hover{border-color:var(--dim)}
+
+  /* settings modal */
+  .overlay{position:fixed;inset:0;background:rgba(4,6,9,.62);z-index:80;display:none;
+    align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)}
+  .overlay.open{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line-2);border-radius:14px;width:min(560px,100%);
+    box-shadow:0 30px 80px rgba(0,0,0,.6);max-height:88vh;display:flex;flex-direction:column}
+  .modal .m-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .modal h2{font-family:var(--display);font-size:17px;margin:0}
+  .modal .x{background:none;border:none;color:var(--faint);font-size:20px;cursor:pointer}
+  .modal .m-body{padding:16px 18px;overflow:auto}
+  .modal p.hint{color:var(--dim);font-size:12.5px;margin:0 0 12px;line-height:1.55}
+  .modal code{font-family:var(--mono);background:var(--raised);padding:1px 5px;border-radius:4px;font-size:11.5px;color:var(--accent);word-break:break-all}
+  .addform{display:flex;flex-direction:column;gap:10px}
+  .addform .row{display:flex;flex-direction:column;gap:5px}
+  .addform label{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .addform input{background:var(--raised);border:1px solid var(--line-2);color:var(--text);
+    border-radius:8px;padding:9px 11px;font-family:var(--body);font-size:13px;outline:none;width:100%}
+  .addform input:focus{border-color:var(--green)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .modal .m-foot{padding:14px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+  .modal .m-foot .right{display:flex;gap:8px;margin-left:auto}
+  .import-report{font-size:12.5px;margin-top:12px;color:var(--dim);line-height:1.55}
+  .import-report .ok{color:var(--green-bright)} .import-report .bad{color:var(--red)}
+  .import-report ul{margin:6px 0 0;padding-left:18px}
+
+  .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:12px;color:var(--dim);background:var(--bg);z-index:90}
+  .loading .spin{width:30px;height:30px;border:3px solid var(--line-2);border-top-color:var(--green);
+    border-radius:50%;animation:sp 0.8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  @media (max-width:980px){
+    body{overflow:auto}
+    .app{height:auto;min-height:100vh}
+    .main{flex-direction:column}
+    .mapwrap{height:54vh;flex:0 0 auto}
+    .panel{flex:1 1 auto;border-left:none;border-top:1px solid var(--line)}
+    .stats{margin-left:0;width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark">Atlas&nbsp;<span class="a">USA</span></span>
+      <span class="tag">penetration&nbsp;map</span>
+    </div>
+
+    <div class="seg brand-toggle" id="brandToggle">
+      <span class="lbl">Brand</span>
+      <button data-brand="all" class="on">All</button>
+      <button data-brand="gpen">GPen</button>
+      <button data-brand="stundenglass">Stündenglass</button>
+    </div>
+
+    <div class="seg metric" id="metricToggle">
+      <span class="lbl">Color&nbsp;by</span>
+      <button data-metric="count" class="on">Accounts</button>
+      <button data-metric="pen">% Penetration</button>
+    </div>
+
+    <div class="seg type-toggle" id="typeToggle">
+      <span class="lbl">Type</span>
+      <button data-type="all" class="on">All</button>
+      <button data-type="Smoke Shop">Smoke</button>
+      <button data-type="Dispensary">Disp</button>
+      <button data-type="Lounge">Lounge</button>
+      <button data-type="Distributor">Distro</button>
+    </div>
+
+    <div class="search">
+      <span class="ico">⌕</span>
+      <input id="searchInput" type="text" placeholder="Find a state…" autocomplete="off" />
+      <div class="results" id="searchResults"></div>
+    </div>
+
+    <div class="stats">
+      <div class="chip green"><span class="n" id="statAccounts">0</span><span class="l">Accounts</span></div>
+      <div class="chip amber"><span class="n" id="statStates">0</span><span class="l">States</span></div>
+      <div class="chip pen"><span class="n" id="statPen">—</span><span class="l">Penetration</span></div>
+      <div class="chip t"><span class="n" id="statSmoke">0</span><span class="l">Smoke</span></div>
+      <div class="chip t"><span class="n" id="statDisp">0</span><span class="l">Disp</span></div>
+      <div class="chip t"><span class="n" id="statLounge">0</span><span class="l">Lounge</span></div>
+      <div class="chip t"><span class="n" id="statDistro">0</span><span class="l">Distro</span></div>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="mapwrap">
+      <svg class="map" id="map"></svg>
+      <div class="zoomctl">
+        <button id="zin" title="Zoom in">+</button>
+        <button id="zout" title="Zoom out">−</button>
+        <button id="zreset" title="Reset view" style="font-size:13px">⤢</button>
+      </div>
+      <div class="legend" id="legend">
+        <div class="lg-title" id="legendTitle">Accounts per state</div>
+        <div class="lg-bar"></div>
+        <div class="lg-scale" id="legendScale"><span>0</span><span></span><span></span></div>
+        <div class="lg-nodata" id="legendNoData" style="display:none"><span class="sw"></span>No totals data</div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div id="panelContent" style="display:flex;flex-direction:column;flex:1 1 auto;min-height:0">
+        <div class="empty-state" id="emptyState">
+          <div class="big">🗺️</div>
+          <h3>Pick a state</h3>
+          <p>Click any state on the map to see its accounts, type breakdown, and penetration.</p>
+        </div>
+      </div>
+      <div class="foot">
+        <button class="btn ghost" id="refreshBtn">↻ Refresh</button>
+        <button class="btn ghost" id="exportBtn">⤓ Export CSV</button>
+        <button class="btn ghost" id="settingsBtn" style="flex:1 1 100%">⚙ Connect Google Sheet</button>
+        <div class="src-status" id="srcStatus"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <div class="m-head">
+      <h2>Connect Google Sheet</h2>
+      <button class="x" id="settingsClose">×</button>
+    </div>
+    <div class="m-body">
+      <p class="hint">Connect a separate locator (Google Sheet) per brand. Each sheet must be shared
+        <strong>“Anyone with the link · Viewer”</strong> (or published to the web) and served over http(s) — opening
+        the page from a <code>file://</code> path will block the fetch. Read-only, no API key, no backend.
+        Leave a brand blank if you don’t have it yet.</p>
+      <div class="addform">
+        <div class="row">
+          <label style="color:#9be29b">GPen locator — Sheet URL or ID</label>
+          <input id="cfgGpenSheet" type="text" placeholder="https://docs.google.com/spreadsheets/d/…  (or just the ID)" />
+        </div>
+        <div class="row">
+          <label>GPen tab name</label>
+          <input id="cfgGpenTab" type="text" placeholder="Sheet1" />
+        </div>
+        <div class="row" style="margin-top:4px">
+          <label style="color:#c79bf2">Stündenglass locator — Sheet URL or ID <span style="color:var(--faint);text-transform:none;letter-spacing:0">(optional — add later)</span></label>
+          <input id="cfgStundSheet" type="text" placeholder="paste when ready…" />
+        </div>
+        <div class="row">
+          <label>Stündenglass tab name</label>
+          <input id="cfgStundTab" type="text" placeholder="Sheet1" />
+        </div>
+        <div class="row" style="margin-top:4px">
+          <label>Totals tab name <span style="color:var(--faint);text-transform:none;letter-spacing:0">(in either workbook; built-in US estimates used if absent)</span></label>
+          <input id="cfgTotalsTab" type="text" placeholder="Totals" />
+        </div>
+      </div>
+      <div class="import-report" id="settingsReport"></div>
+    </div>
+    <div class="m-foot">
+      <button class="btn ghost" id="useSampleBtn">Use sample data</button>
+      <div class="right">
+        <button class="btn ghost" id="settingsCancel">Cancel</button>
+        <button class="btn primary" id="settingsSave">Save &amp; load</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="loading" id="loading"><div class="spin"></div><div>Loading the map…</div></div>
+
+<script>
+const US_TOPO = __US_TOPO_JSON__;
+</script>
+<script>
+/* ============================================================================
+   Atlas USA — US account penetration map
+   Self-contained: inlined d3 v7 + topojson-client + us-atlas states-10m above.
+   Data source: a Google Sheet read live via the published-CSV/gviz endpoint.
+   ========================================================================== */
+
+/* ---------- tunable constants (edit these) -------------------------------- */
+
+// Heat-map thresholds. Color scale is red -> yellow -> green.
+//   count:       0 accounts = red, `mid` = yellow, `high`+ = green
+//   penetration: 0% = red, `mid`% = yellow, `high`%+ = green
+const HEAT = {
+  count:       { mid: 3, high: 12 },
+  penetration: { mid: 5, high: 20 },    // percent
+};
+const HEAT_COLORS = { red:'#b3494f', yellow:'#f5b94a', green:'#2ec46b' };
+const NODATA_COLOR = '#283142';
+
+const TYPES = ['Smoke Shop','Dispensary','Lounge','Distributor'];
+const BRANDS = { gpen:'GPen', stundenglass:'Stündenglass' };
+
+const LS_KEY = 'atlas_usa_cfg_v1';
+
+/* ---------- sample data (renders before a Sheet is connected) ------------- */
+const SAMPLE_ACCOUNTS_CSV = `Name,Address,City,State,Type,GPen,Stundenglass,Lat,Lng,Notes
+Cloud9 Smoke Co,1200 Congress Ave,Austin,TX,Smoke Shop,TRUE,FALSE,30.2711,-97.7437,Flagship
+Lone Star Vapor,455 Main St,Dallas,TX,Smoke Shop,TRUE,TRUE,32.7767,-96.7970,
+Hill Country Dispensary,88 Rio Grande,Austin,TX,Dispensary,FALSE,TRUE,,,Medical only
+Bayou Lounge,21 Bourbon St,Houston,TX,Lounge,TRUE,TRUE,29.7604,-95.3698,VIP hookah
+West Coast Wholesale,900 Industrial Blvd,Los Angeles,CA,Distributor,TRUE,TRUE,34.0522,-118.2437,net-30
+Venice Smoke Shop,1500 Ocean Front Walk,Los Angeles,CA,Smoke Shop,TRUE,FALSE,33.9850,-118.4695,
+Golden Gate Dispensary,77 Market St,San Francisco,CA,Dispensary,TRUE,TRUE,37.7749,-122.4194,Recreational
+SD Vapor Lounge,300 5th Ave,San Diego,CA,Lounge,FALSE,TRUE,32.7157,-117.1611,
+Empire Smoke,500 8th Ave,New York,NY,Smoke Shop,TRUE,TRUE,40.7128,-74.0060,Manhattan
+Brooklyn Dispensary,120 Bedford Ave,Brooklyn,NY,Dispensary,TRUE,FALSE,40.7081,-73.9571,
+Mile High Dispensary,1600 Broadway,Denver,CO,Dispensary,TRUE,TRUE,39.7392,-104.9903,Recreational
+Rocky Mtn Smoke,210 Pearl St,Boulder,CO,Smoke Shop,FALSE,TRUE,40.0150,-105.2705,
+Sunshine Smoke Shop,701 Brickell Ave,Miami,FL,Smoke Shop,TRUE,FALSE,25.7617,-80.1918,
+Gulf Coast Distribution,55 Bay St,Tampa,FL,Distributor,TRUE,TRUE,27.9506,-82.4572,Regional hub
+Emerald City Lounge,1000 Pike St,Seattle,WA,Lounge,TRUE,TRUE,47.6062,-122.3321,
+Cascade Smoke,420 Pine St,Seattle,WA,Smoke Shop,TRUE,FALSE,47.6101,-122.3344,
+Windy City Smoke,233 S Wacker,Chicago,IL,Smoke Shop,FALSE,TRUE,41.8781,-87.6298,
+Peach State Vapor,191 Peachtree St,Atlanta,GA,Smoke Shop,TRUE,FALSE,33.7490,-84.3880,
+Desert Smoke,2 E Washington St,Phoenix,AZ,Smoke Shop,TRUE,TRUE,33.4484,-112.0740,
+Vegas Lounge,3700 Las Vegas Blvd,Las Vegas,NV,Lounge,TRUE,TRUE,36.1147,-115.1728,Strip location`;
+
+const SAMPLE_TOTALS_CSV = `State,SmokeShops,Dispensaries,Lounges
+AL,160,0,0
+AK,19,155,3
+AZ,234,160,0
+AR,100,37,0
+CA,1247,1412,33
+CO,238,668,3
+CT,208,74,0
+DE,95,12,0
+DC,47,65,0
+FL,1289,766,0
+GA,464,19,0
+HI,32,25,0
+ID,32,0,0
+IL,361,255,3
+IN,190,0,0
+IA,91,5,0
+KS,253,0,0
+KY,167,12,0
+LA,94,28,0
+ME,27,220,0
+MD,332,116,0
+MA,157,410,0
+MI,455,950,4
+MN,75,55,1
+MS,96,175,0
+MO,288,224,0
+MT,24,500,0
+NE,85,0,0
+NV,128,103,2
+NH,126,7,0
+NJ,420,323,3
+NM,96,300,7
+NY,853,600,0
+NC,411,1,0
+ND,11,8,0
+OH,420,190,0
+OK,159,1355,0
+OR,129,795,0
+PA,568,190,0
+RI,49,7,0
+SC,174,0,0
+SD,45,51,0
+TN,282,0,0
+TX,2664,3,0
+UT,69,15,0
+VT,25,108,0
+VA,330,22,0
+WA,132,473,0
+WV,63,65,0
+WI,166,0,0
+WY,15,0,0`;
+
+/* ---------- state name <-> abbreviation ----------------------------------- */
+const ABBR_TO_NAME = {
+  AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',
+  CT:'Connecticut',DE:'Delaware',DC:'District of Columbia',FL:'Florida',GA:'Georgia',
+  HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',
+  LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',
+  MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',
+  NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',
+  OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',
+  SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',
+  WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming'
+  // territories (PR/VI/GU/AS/MP) are omitted: geoAlbersUsa can't place them.
+  // Accounts in those locations are reported as "unplaced".
+};
+const NAME_TO_ABBR = {};
+Object.keys(ABBR_TO_NAME).forEach(a => NAME_TO_ABBR[ABBR_TO_NAME[a].toLowerCase()] = a);
+
+function normState(raw){
+  if(!raw) return null;
+  const s = String(raw).trim();
+  if(!s) return null;
+  const up = s.toUpperCase();
+  if(ABBR_TO_NAME[up]) return ABBR_TO_NAME[up];          // 2-letter code
+  const low = s.toLowerCase();
+  if(NAME_TO_ABBR[low]) return ABBR_TO_NAME[NAME_TO_ABBR[low]]; // full name (canonicalized)
+  return null;
+}
+// Derive a state from a free-form address: trailing 2-letter code OR spelled-out state name,
+// optionally before a ZIP — e.g. "…, TX 78701", "…, Austin, Texas 78741", "…, New York".
+function stateFromAddress(addr){
+  if(!addr) return null;
+  const s = String(addr).trim().replace(/,?\s*(USA|United States)\.?\s*$/i,'');  // strip trailing country
+  let m = s.match(/,?\s*([A-Za-z]{2})\s+\d{5}(?:-\d{4})?\s*$/);   // "..., TX 78701"
+  if(m && ABBR_TO_NAME[m[1].toUpperCase()]) return ABBR_TO_NAME[m[1].toUpperCase()];
+  m = s.match(/,\s*([A-Za-z][A-Za-z .]+?)\s*(?:\d{5}(?:-\d{4})?)?\s*$/);  // "..., Texas 78741" / "..., New York"
+  if(m){ const st = normState(m[1].trim()); if(st) return st; }
+  m = s.match(/,\s*([A-Za-z]{2})\s*$/);                            // "..., TX"
+  if(m && ABBR_TO_NAME[m[1].toUpperCase()]) return ABBR_TO_NAME[m[1].toUpperCase()];
+  // last resort: latest spelled-out state name in the address tail ("…Canutillo Texas 79835")
+  const tail = s.slice(-45).toLowerCase();
+  let best=null, bestAt=-1;
+  for(const low in NAME_TO_ABBR){
+    const i = tail.lastIndexOf(low);
+    if(i>=0 && i+low.length>bestAt){ bestAt=i+low.length; best=ABBR_TO_NAME[NAME_TO_ABBR[low]]; }
+  }
+  return best;
+}
+
+function normType(raw){
+  const s = String(raw||'').trim().toLowerCase();
+  if(!s) return null;
+  if(s.includes('smoke') || s.includes('head shop') || s.includes('vape') || s.includes('vapor')) return 'Smoke Shop';
+  if(s.includes('disp')) return 'Dispensary';
+  if(s.includes('lounge') || s.includes('hookah')) return 'Lounge';
+  if(s.includes('distrib') || s.includes('distro') || s.includes('wholesale')) return 'Distributor';
+  return null;
+}
+
+function normBool(raw){
+  const s = String(raw||'').trim().toLowerCase();
+  return s==='true' || s==='yes' || s==='y' || s==='1' || s==='x' || s==='✓' || s==='t';
+}
+
+/* ---------- CSV parsing --------------------------------------------------- */
+function parseCSV(text){
+  const rows=[]; let row=[], field='', inq=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inq){
+      if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i++; } else inq=false; }
+      else field+=c;
+    } else {
+      if(c==='"') inq=true;
+      else if(c===',') { row.push(field); field=''; }
+      else if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else if(c==='\r'){ /* skip */ }
+      else field+=c;
+    }
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+// loose header key: lowercase, strip everything non-alphanumeric
+const hkey = h => String(h||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+function rowsToObjects(rows){
+  if(!rows.length) return [];
+  const headers = rows[0].map(hkey);
+  const out=[];
+  for(let r=1;r<rows.length;r++){
+    const cells = rows[r];
+    if(cells.every(c => String(c).trim()==='')) continue;  // skip blank lines
+    const o={};
+    headers.forEach((h,i)=> { o[h] = cells[i]!==undefined ? String(cells[i]).trim() : ''; });
+    out.push(o);
+  }
+  return out;
+}
+// pick the first matching header from a list of candidate keys
+function pick(o, ...cands){
+  for(const c of cands){ if(o[c]!==undefined && o[c]!=='') return o[c]; }
+  for(const c of cands){ if(o[c]!==undefined) return o[c]; }
+  return '';
+}
+
+/* ---------- ingest accounts + totals -------------------------------------- */
+function ingestAccounts(csv){
+  const objs = rowsToObjects(parseCSV(csv));
+  const accounts=[], unplaced=[];
+  objs.forEach((o,idx)=>{
+    const name = pick(o,'name','account','accountname','business','businessname','store','location');
+    const address = pick(o,'address','addr','street','fulladdress');
+    const city = pick(o,'city','town');
+    let st = normState(pick(o,'state','st','province','region'));
+    if(!st) st = stateFromAddress(address) || stateFromAddress(city);
+    let type = normType(pick(o,'type','category','accounttype','channel','class','classification','storetype','venue'));
+    if(!type){
+      // fallback: no recognized Type header — scan only UNRECOGNIZED columns for a type
+      // keyword (handles a Type column with an unexpected/blank header, e.g. column F).
+      // Skips known fields so a business named "…Smoke…" can't be mis-typed.
+      const KNOWN = new Set(['name','account','accountname','business','businessname','store','location',
+        'address','addr','street','fulladdress','city','town','state','st','province','region',
+        'gpen','gpenstatus','gpencarried','g_pen','carriesgpen','stundenglass','stundenglas','stunglass',
+        'stundenglassstatus','stund','lat','latitude','lng','lon','long','longitude',
+        'notes','note','comment','comments','remarks']);
+      for(const k in o){ if(KNOWN.has(k)) continue; const t = normType(o[k]); if(t){ type = t; break; } }
+    }
+    const gpen = normBool(pick(o,'gpen','gpenstatus','gpencarried','g_pen','carriesgpen'));
+    const stund = normBool(pick(o,'stundenglass','stundenglas','stunglass','stundenglassstatus','stund'));
+    const latRaw = pick(o,'lat','latitude'); const lngRaw = pick(o,'lng','lon','long','longitude');
+    const lat = latRaw!=='' ? parseFloat(latRaw) : null;
+    const lng = lngRaw!=='' ? parseFloat(lngRaw) : null;
+    const notes = pick(o,'notes','note','comment','comments','remarks');
+    const rec = {
+      name: name || '(unnamed)', address, city, state: st, type: type || 'Smoke Shop',
+      typeKnown: !!type, gpen, stundenglass: stund,
+      lat: (lat!==null && isFinite(lat)) ? lat : null,
+      lng: (lng!==null && isFinite(lng)) ? lng : null,
+      notes, _row: idx+2
+    };
+    if(st) accounts.push(rec); else unplaced.push(rec);
+  });
+  return { accounts, unplaced };
+}
+function ingestTotals(csv){
+  const objs = rowsToObjects(parseCSV(csv));
+  const totals={};
+  objs.forEach(o=>{
+    const st = normState(pick(o,'state','st'));
+    if(!st) return;
+    const num = v => { const n = parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isFinite(n)?n:0; };
+    totals[st] = {
+      'Smoke Shop':  num(pick(o,'smokeshops','smokeshop','smoke','headshops')),
+      'Dispensary':  num(pick(o,'dispensaries','dispensary','disp','dispensarys')),
+      'Lounge':      num(pick(o,'lounges','lounge')),
+      'Distributor': num(pick(o,'distributors','distributor','distro','distros')),
+    };
+  });
+  return totals;
+}
+
+/* ---------- application state --------------------------------------------- */
+let DATA = { accounts:[], unplaced:[], totals:{} };
+let filter = { brand:'all', type:'all', metric:'count' };
+let selected = null;            // selected state name
+let acctQuery = '';            // panel account search
+let cfg = loadCfg();
+
+let svg, gStates, gPins, gLabels, path, projection, zoom, width, height;
+const tip = document.getElementById('tip');
+
+/* ---------- config persistence -------------------------------------------- */
+// One locator (Google Sheet) per brand. Accounts inherit the brand of the locator
+// they come from; a store appearing in both locators is merged into one (carries both).
+function defaultCfg(){ return {
+  gpen:  { sheetId:'', tab:'Sheet1' },
+  stund: { sheetId:'', tab:'Sheet1' },
+  totalsTab:'Totals',
+  usingSample:true
+}; }
+function loadCfg(){
+  try{
+    const s=localStorage.getItem(LS_KEY);
+    if(s){
+      const o=JSON.parse(s);
+      if(o.sheetId && !o.gpen){            // migrate old single-sheet config -> GPen locator
+        o.gpen={ sheetId:o.sheetId, tab:o.accountsTab||'Sheet1' };
+        o.stund={ sheetId:'', tab:'Sheet1' };
+        o.totalsTab=o.totalsTab||'Totals';
+        delete o.sheetId; delete o.accountsTab;
+      }
+      return Object.assign(defaultCfg(), o);
+    }
+  }catch(e){}
+  return defaultCfg();
+}
+function saveCfg(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(cfg)); }catch(e){} }
+function extractSheetId(raw){
+  const s=String(raw||'').trim();
+  const m=s.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if(m) return m[1];
+  if(/^[a-zA-Z0-9-_]{20,}$/.test(s)) return s;   // looks like a bare ID
+  return '';
+}
+function gvizUrl(sheetId, tab){
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
+}
+
+/* ---------- data loading -------------------------------------------------- */
+async function fetchCsv(sheetId, tab){
+  const r = await fetch(gvizUrl(sheetId, tab) + '&_=' + Date.now());
+  if(!r.ok) throw new Error('HTTP '+r.status+' fetching tab "'+tab+'"');
+  const text = await r.text();
+  if(/<HTML|<!DOCTYPE|signin|accounts\.google/i.test(text.slice(0,400)))
+    throw new Error('Sheet not link-shared (got a sign-in page) for tab "'+tab+'"');
+  return text;
+}
+
+async function loadData(){
+  setStatus('loading','Loading…');
+  const haveG = !cfg.usingSample && cfg.gpen.sheetId;
+  const haveS = !cfg.usingSample && cfg.stund.sheetId;
+  if(!haveG && !haveS){
+    DATA = buildDataMulti([{brand:'gpen',csv:SAMPLE_ACCOUNTS_CSV}], SAMPLE_TOTALS_CSV);
+    setStatus('', 'Showing <strong>sample data</strong>. <span class="warnlink" id="openSettingsLink">Connect your locators →</span>');
+    const lk=document.getElementById('openSettingsLink'); if(lk) lk.onclick=openSettings;
+    afterLoad();
+    return;
+  }
+  try{
+    const tasks=[];
+    if(haveG) tasks.push(fetchCsv(cfg.gpen.sheetId, cfg.gpen.tab).then(csv=>({brand:'gpen', csv})));
+    if(haveS) tasks.push(fetchCsv(cfg.stund.sheetId, cfg.stund.tab).then(csv=>({brand:'stundenglass', csv})));
+    const totalsSheet = cfg.gpen.sheetId || cfg.stund.sheetId;
+    const totalsP = fetchCsv(totalsSheet, cfg.totalsTab).catch(e=>{ console.warn('Totals tab:', e.message); return ''; });
+    const [sources, tCsv] = await Promise.all([Promise.all(tasks), totalsP]);
+    DATA = buildDataMulti(sources, tCsv);
+
+    const parts=[];
+    if(haveG) parts.push(`<strong>${DATA.byBrand.gpen}</strong> GPen`);
+    if(haveS) parts.push(`<strong>${DATA.byBrand.stundenglass}</strong> Stündenglass`);
+    let msg = `Loaded ${parts.join(' + ')} → <strong>${DATA.accounts.length}</strong> stores.`;
+    if(DATA.totalsSource==='builtin') msg += ` Penetration uses built-in US store estimates (add a <strong>Totals</strong> tab to override).`;
+    if(DATA.unplaced.length) msg += ` <span class="warnlink" id="unplacedLink">${DATA.unplaced.length} unplaced →</span>`;
+    setStatus('ok', msg);
+    const ul=document.getElementById('unplacedLink'); if(ul) ul.onclick=showUnplaced;
+    afterLoad();
+  }catch(e){
+    console.error(e);
+    setStatus('err', 'Couldn’t load locators: '+e.message+' — showing sample data. <span class="warnlink" id="openSettingsLink2">Settings →</span>');
+    const lk=document.getElementById('openSettingsLink2'); if(lk) lk.onclick=openSettings;
+    DATA = buildDataMulti([{brand:'gpen',csv:SAMPLE_ACCOUNTS_CSV}], SAMPLE_TOTALS_CSV);
+    afterLoad();
+  }
+}
+// dedup key: same name + start of street address + state => same physical store
+function dedupKey(a){
+  return (a.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') + '|'
+       + (a.address||'').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,18) + '|'
+       + (a.state||'');
+}
+// sources: [{brand:'gpen'|'stundenglass', csv}], merged into one deduped account set.
+function buildDataMulti(sources, tCsv){
+  const map = new Map();
+  const unplaced = [];
+  const byBrand = { gpen:0, stundenglass:0 };
+  sources.forEach(src=>{
+    const { accounts, unplaced:un } = ingestAccounts(src.csv);
+    byBrand[src.brand] += accounts.length;
+    un.forEach(u=>{ u[src.brand]=true; unplaced.push(u); });
+    accounts.forEach(a=>{
+      a[src.brand]=true;                       // brand inherited from the locator
+      const key = dedupKey(a);
+      const existing = map.get(key);
+      if(existing){ existing.gpen = existing.gpen||a.gpen; existing.stundenglass = existing.stundenglass||a.stundenglass; }
+      else map.set(key, a);
+    });
+  });
+  let totals = tCsv ? ingestTotals(tCsv) : {};
+  let totalsSource = 'sheet';
+  if(Object.keys(totals).length === 0){        // no usable Totals tab -> built-in US store estimates
+    totals = ingestTotals(SAMPLE_TOTALS_CSV);
+    totalsSource = 'builtin';
+  }
+  return { accounts:[...map.values()], unplaced, totals, totalsSource, byBrand };
+}
+function afterLoad(){
+  recolor();
+  renderStats();
+  if(selected) renderPanel(selected); else renderEmpty();
+  if(DATA.unplaced.length) console.warn('Unplaced rows (no state):', DATA.unplaced);
+}
+
+/* ---------- filtering / metrics ------------------------------------------- */
+function brandOK(a){
+  if(filter.brand==='gpen') return a.gpen;
+  if(filter.brand==='stundenglass') return a.stundenglass;
+  return true;
+}
+function typeOK(a){ return filter.type==='all' ? true : a.type===filter.type; }
+function passes(a){ return brandOK(a) && typeOK(a); }
+
+// accounts in a state matching the active brand+type filter
+function acctsIn(stateName){ return DATA.accounts.filter(a => a.state===stateName && passes(a)); }
+
+// universe denominator for a state under the active type filter
+function universeFor(stateName){
+  const t = DATA.totals[stateName];
+  if(!t) return null;
+  if(filter.type!=='all') return t[filter.type] || 0;
+  // 'all' -> sum the type universes present
+  return TYPES.reduce((s,ty)=> s + (t[ty]||0), 0);
+}
+// penetration % for a state (null if no/zero universe)
+function penFor(stateName){
+  const denom = universeFor(stateName);
+  if(denom===null || denom<=0) return null;
+  return (acctsIn(stateName).length / denom) * 100;
+}
+
+// color scale for the active metric
+function heatScale(){
+  const k = filter.metric==='pen' ? HEAT.penetration : HEAT.count;
+  return d3.scaleLinear().domain([0,k.mid,k.high])
+    .range([HEAT_COLORS.red, HEAT_COLORS.yellow, HEAT_COLORS.green]).clamp(true);
+}
+function stateColor(stateName){
+  if(filter.metric==='pen'){
+    const p = penFor(stateName);
+    if(p===null) return NODATA_COLOR;          // no totals -> grey
+    return heatScale()(p);
+  }
+  return heatScale()(acctsIn(stateName).length);
+}
+
+/* ---------- map build ----------------------------------------------------- */
+function buildMap(){
+  const states = topojson.feature(US_TOPO, US_TOPO.objects.states);
+  // keep only the 50 states + DC (drop territories geoAlbersUsa can't place)
+  states.features = states.features.filter(f => !!NAME_TO_ABBR[f.properties.name.toLowerCase()]);
+
+  const wrap = document.querySelector('.mapwrap');
+  width = wrap.clientWidth; height = wrap.clientHeight;
+
+  svg = d3.select('#map').attr('viewBox', `0 0 ${width} ${height}`);
+  svg.selectAll('*').remove();
+  const gRoot = svg.append('g');
+  gStates = gRoot.append('g');
+  gPins  = gRoot.append('g');
+  gLabels= gRoot.append('g');
+
+  projection = d3.geoAlbersUsa();
+  path = d3.geoPath(projection);
+  projection.fitExtent([[16,16],[width-16,height-16]], states);
+
+  gStates.selectAll('path.state')
+    .data(states.features, d=>d.properties.name)
+    .join('path')
+      .attr('class','state')
+      .attr('d', path)
+      .on('mousemove', onHover)
+      .on('mouseleave', hideTip)
+      .on('click', (e,d)=> selectState(d.properties.name, true));
+
+  // state labels: abbreviation + a value line (account count, or penetration %)
+  gLabels.selectAll('text.slabel')
+    .data(states.features, d=>d.properties.name)
+    .join('text')
+      .attr('class','slabel')
+      .attr('transform', d=>{ const c=path.centroid(d); return `translate(${c[0]},${c[1]})`; })
+      .each(function(d){
+        const t=d3.select(this); t.selectAll('*').remove();
+        t.append('tspan').attr('class','ab').attr('x',0).attr('dy','-0.12em')
+          .text(NAME_TO_ABBR[d.properties.name.toLowerCase()] || '');
+        t.append('tspan').attr('class','val').attr('x',0).attr('dy','1.05em');
+      });
+
+  // zoom / pan
+  zoom = d3.zoom().scaleExtent([1,9]).on('zoom', (e)=>{
+    gRoot.attr('transform', e.transform);
+    gLabels.selectAll('text').attr('font-size', (10/e.transform.k)+'px');
+    gPins.selectAll('circle').attr('r', (3/e.transform.k));
+  });
+  svg.call(zoom)
+     .on('dblclick.zoom', null);
+  svg.on('mousedown', ()=>svg.classed('dragging',true))
+     .on('mouseup', ()=>svg.classed('dragging',false));
+
+  renderPins();
+  recolor();
+}
+
+function renderPins(){
+  const pts = DATA.accounts.filter(a => a.lat!=null && a.lng!=null && passes(a));
+  const sel = gPins.selectAll('circle.pin').data(pts, (d,i)=>d.name+i);
+  sel.exit().remove();
+  sel.enter().append('circle').attr('class','pin').attr('r',3)
+    .merge(sel)
+    .attr('cx', d=>{ const p=projection([d.lng,d.lat]); return p?p[0]:-9999; })
+    .attr('cy', d=>{ const p=projection([d.lng,d.lat]); return p?p[1]:-9999; })
+    .style('display', d=> projection([d.lng,d.lat]) ? null : 'none');
+}
+
+// value drawn under each state's abbreviation; blank where we have no presence (keeps the map clean)
+function labelValue(name){
+  const n = acctsIn(name).length;
+  if(filter.metric==='pen'){
+    if(!n) return '';
+    const p = penFor(name);
+    if(p===null) return '';
+    return (p<10 ? p.toFixed(1) : Math.round(p)) + '%';
+  }
+  return n ? String(n) : '';
+}
+function recolor(){
+  if(!gStates) return;
+  gStates.selectAll('path.state')
+    .style('fill', d=> stateColor(d.properties.name))   // inline style beats the .state CSS rule
+    .classed('sel', d=> d.properties.name===selected);
+  gLabels.selectAll('text.slabel').classed('sel', d=> d.properties.name===selected)
+    .select('tspan.val').text(d=> labelValue(d.properties.name));
+  renderPins();
+  renderLegend();
+}
+
+/* ---------- legend -------------------------------------------------------- */
+function renderLegend(){
+  const isPen = filter.metric==='pen';
+  const k = isPen ? HEAT.penetration : HEAT.count;
+  document.getElementById('legendTitle').textContent =
+    (isPen ? '% penetration' : 'Accounts') + ' per state' +
+    (filter.brand==='all' ? '' : ' · '+BRANDS[filter.brand]) +
+    (filter.type==='all' ? '' : ' · '+filter.type);
+  const scaleEl = document.getElementById('legendScale');
+  if(isPen) scaleEl.innerHTML = `<span>0%</span><span>${k.mid}%</span><span>${k.high}%+</span>`;
+  else      scaleEl.innerHTML = `<span>0</span><span>${k.mid}</span><span>${k.high}+</span>`;
+  document.getElementById('legendNoData').style.display = isPen ? 'flex' : 'none';
+}
+
+/* ---------- header stats -------------------------------------------------- */
+function renderStats(){
+  const acc = DATA.accounts.filter(passes);
+  document.getElementById('statAccounts').textContent = acc.length;
+  const statesCovered = new Set(acc.map(a=>a.state));
+  document.getElementById('statStates').textContent = statesCovered.size;
+
+  // overall penetration across all states (numerator filtered, denominator = universe)
+  let num=0, den=0;
+  Object.keys(NAME_TO_ABBR).forEach(low=>{
+    const name = ABBR_TO_NAME[NAME_TO_ABBR[low]];
+    const u = universeFor(name);
+    if(u && u>0){ den += u; num += acctsIn(name).length; }
+  });
+  document.getElementById('statPen').textContent = den>0 ? Math.round(num/den*100)+'%' : '—';
+
+  const byType = t => DATA.accounts.filter(a=> a.type===t && brandOK(a) && (filter.type==='all'||filter.type===t)).length;
+  document.getElementById('statSmoke').textContent  = byType('Smoke Shop');
+  document.getElementById('statDisp').textContent   = byType('Dispensary');
+  document.getElementById('statLounge').textContent = byType('Lounge');
+  document.getElementById('statDistro').textContent = byType('Distributor');
+}
+
+/* ---------- tooltip ------------------------------------------------------- */
+function onHover(e,d){
+  const name = d.properties.name;
+  const n = acctsIn(name).length;
+  const p = penFor(name);
+  const u = universeFor(name);
+  const uLabel = 'Total' + (filter.type==='all' ? '' : ' '+filter.type);
+  const breakdown = TYPES.map(t=>{
+    const c = DATA.accounts.filter(a=>a.state===name && a.type===t && brandOK(a)).length;
+    return c? `${t.split(' ')[0]} ${c}` : null;
+  }).filter(Boolean).join('  ·  ');
+  tip.innerHTML = `<div class="tname">${esc(name)}</div>
+    <div class="trow"><span class="k">Accounts</span><span class="v">${n}</span></div>
+    <div class="trow"><span class="k">${esc(uLabel)}</span><span class="v">${u===null?'—':u.toLocaleString()}</span></div>
+    <div class="trow"><span class="k">Penetration</span><span class="v">${p===null?'—':p.toFixed(1)+'%'}</span></div>
+    ${breakdown? `<div class="tbreak">${esc(breakdown)}</div>`:''}`;
+  tip.classList.add('show');
+  const pad=14, w=tip.offsetWidth, h=tip.offsetHeight;
+  let x=e.clientX+pad, y=e.clientY+pad;
+  if(x+w>window.innerWidth) x=e.clientX-w-pad;
+  if(y+h>window.innerHeight) y=e.clientY-h-pad;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+function hideTip(){ tip.classList.remove('show'); }
+
+/* ---------- selection + side panel ---------------------------------------- */
+function selectState(name, zoomTo){
+  selected = name; acctQuery='';
+  recolor();
+  renderPanel(name);
+  if(zoomTo) zoomToState(name);
+}
+function zoomToState(name){
+  const feat = gStates.selectAll('path.state').data().find(d=>d.properties.name===name);
+  if(!feat) return;
+  const b = path.bounds(feat);
+  const dx=b[1][0]-b[0][0], dy=b[1][1]-b[0][1];
+  const cx=(b[0][0]+b[1][0])/2, cy=(b[0][1]+b[1][1])/2;
+  const scale = Math.min(9, 0.85/Math.max(dx/width, dy/height));
+  const t = d3.zoomIdentity.translate(width/2-scale*cx, height/2-scale*cy).scale(scale);
+  svg.transition().duration(650).call(zoom.transform, t);
+}
+
+function renderEmpty(){
+  document.getElementById('panelContent').innerHTML =
+    `<div class="empty-state"><div class="big">🗺️</div><h3>Pick a state</h3>
+     <p>Click any state on the map to see its accounts, type breakdown, and penetration.</p></div>`;
+}
+
+function renderPanel(name){
+  const all = acctsIn(name);                          // honors brand+type filter
+  const t = DATA.totals[name];
+  const overallPen = penFor(name);
+
+  // penetration per type
+  const penRows = TYPES.map(ty=>{
+    const cnt = DATA.accounts.filter(a=>a.state===name && a.type===ty && brandOK(a)).length;
+    const uni = t ? (t[ty]||0) : 0;
+    const pct = uni>0 ? (cnt/uni*100) : null;
+    // when a type filter is active, only show that row
+    if(filter.type!=='all' && filter.type!==ty) return '';
+    const pctTxt = pct===null ? '—' : pct.toFixed(1)+'%';
+    const w = pct===null ? 0 : Math.min(100, pct);
+    return `<div class="pen-row">
+      <div class="pr-top"><span class="pr-label">${ty}</span>
+        <span class="pr-val"><b>${pctTxt}</b> · ${cnt}${uni? '/'+uni : ''}</span></div>
+      <div class="pr-bar"><div class="pr-fill" style="width:${w}%;background:${pct===null?'var(--nodata)':heatScale()(filter.metric==='pen'?pct:0)}"></div></div>
+    </div>`;
+  }).join('');
+
+  const overallW = overallPen===null ? 0 : Math.min(100, overallPen);
+  const overallTxt = overallPen===null ? '—' : overallPen.toFixed(1)+'%';
+  const totalUni = universeFor(name);
+  const overallRow = `<div class="pen-row overall">
+    <div class="pr-top"><span class="pr-label">Overall</span>
+      <span class="pr-val"><b>${overallTxt}</b> · ${all.length}${totalUni? '/'+totalUni : ''}</span></div>
+    <div class="pr-bar"><div class="pr-fill" style="width:${overallW}%"></div></div></div>`;
+
+  let badgeClass='no', badgeTxt='No accounts';
+  if(all.length){
+    if(overallPen===null){ badgeClass='mid'; badgeTxt = all.length+' account'+(all.length===1?'':'s'); }
+    else if(overallPen>=HEAT.penetration.high){ badgeClass='yes'; badgeTxt='High penetration'; }
+    else if(overallPen>=HEAT.penetration.mid){ badgeClass='mid'; badgeTxt='Moderate penetration'; }
+    else { badgeClass='no'; badgeTxt='Low penetration'; }
+  }
+
+  document.getElementById('panelContent').innerHTML = `
+    <div class="head">
+      <h2 class="state-name">${esc(name)}</h2>
+      <span class="cov-badge ${badgeClass}">${esc(badgeTxt)}</span>
+    </div>
+    <div class="scroll">
+      <div class="tally"><span class="rt-label">Total accounts${filter.brand!=='all'?' · '+BRANDS[filter.brand]:''}${filter.type!=='all'?' · '+filter.type:''}</span>
+        <span class="rt-val">${all.length}</span></div>
+
+      <div class="sec-label">Penetration by type</div>
+      <div class="pen-block">${penRows || '<div class="panel-empty">No type selected.</div>'}${overallRow}</div>
+
+      <div class="sec-label">Accounts (${all.length})</div>
+      <div class="acct-filter"><span class="ico">⌕</span>
+        <input id="acctSearch" type="text" placeholder="Filter accounts…" value="${esc(acctQuery)}"/></div>
+      <div class="acct-list" id="acctList"></div>
+    </div>`;
+
+  const search = document.getElementById('acctSearch');
+  search.addEventListener('input', ()=>{ acctQuery=search.value; renderAcctList(name); });
+  renderAcctList(name);
+}
+
+function renderAcctList(name){
+  const q = acctQuery.trim().toLowerCase();
+  let list = acctsIn(name);
+  if(q) list = list.filter(a =>
+    (a.name+' '+a.city+' '+a.type+' '+a.address+' '+a.notes).toLowerCase().includes(q));
+  const el = document.getElementById('acctList');
+  if(!list.length){ el.innerHTML = `<div class="panel-empty">No matching accounts.</div>`; return; }
+  el.innerHTML = list.map(a=>`
+    <div class="acct"><div class="a-main">
+      <div class="a-name">${esc(a.name)}</div>
+      <div class="a-tags">
+        <span class="tag-chip type">${esc(a.type)}</span>
+        ${a.gpen? '<span class="tag-chip gpen">GPen</span>':''}
+        ${a.stundenglass? '<span class="tag-chip stund">Stündenglass</span>':''}
+      </div>
+      ${(a.city||a.address)? `<div class="a-loc">${esc([a.city, a.address].filter(Boolean).join(' · '))}</div>`:''}
+      ${a.notes? `<div class="a-note">${esc(a.notes)}</div>`:''}
+    </div></div>`).join('');
+}
+
+/* ---------- search (jump to state) ---------------------------------------- */
+const searchInput = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+searchInput.addEventListener('input', ()=>{
+  const q = searchInput.value.trim().toLowerCase();
+  if(!q){ searchResults.classList.remove('open'); return; }
+  const matches = Object.keys(NAME_TO_ABBR)
+    .map(low=>ABBR_TO_NAME[NAME_TO_ABBR[low]])
+    .filter(n=> n.toLowerCase().includes(q) || NAME_TO_ABBR[n.toLowerCase()].toLowerCase()===q)
+    .slice(0,8);
+  if(!matches.length){ searchResults.classList.remove('open'); return; }
+  searchResults.innerHTML = matches.map(n=>{
+    const c = acctsIn(n).length;
+    return `<button data-state="${esc(n)}"><span>${esc(n)}</span>
+      <span class="cov ${c?'yes':''}">${c} acct${c===1?'':'s'}</span></button>`;
+  }).join('');
+  searchResults.classList.add('open');
+  searchResults.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    selectState(b.dataset.state, true);
+    searchInput.value=''; searchResults.classList.remove('open');
+  });
+});
+document.addEventListener('click', e=>{ if(!e.target.closest('.search')) searchResults.classList.remove('open'); });
+
+/* ---------- toggles ------------------------------------------------------- */
+function wireSeg(id, key, after){
+  document.querySelectorAll(`#${id} button`).forEach(btn=>{
+    btn.onclick=()=>{
+      document.querySelectorAll(`#${id} button`).forEach(b=>b.classList.remove('on'));
+      btn.classList.add('on');
+      filter[key] = btn.dataset[key];
+      recolor(); renderStats();
+      if(selected) renderPanel(selected);
+      if(after) after();
+    };
+  });
+}
+wireSeg('brandToggle','brand');
+wireSeg('metricToggle','metric');
+wireSeg('typeToggle','type');
+
+/* ---------- zoom buttons -------------------------------------------------- */
+document.getElementById('zin').onclick  = ()=> svg.transition().duration(250).call(zoom.scaleBy,1.5);
+document.getElementById('zout').onclick = ()=> svg.transition().duration(250).call(zoom.scaleBy,1/1.5);
+document.getElementById('zreset').onclick = ()=> svg.transition().duration(450).call(zoom.transform, d3.zoomIdentity);
+
+/* ---------- settings modal ------------------------------------------------ */
+const settingsOverlay = document.getElementById('settingsOverlay');
+function openSettings(){
+  document.getElementById('cfgGpenSheet').value  = cfg.gpen.sheetId;
+  document.getElementById('cfgGpenTab').value    = cfg.gpen.tab;
+  document.getElementById('cfgStundSheet').value = cfg.stund.sheetId;
+  document.getElementById('cfgStundTab').value   = cfg.stund.tab;
+  document.getElementById('cfgTotalsTab').value  = cfg.totalsTab;
+  document.getElementById('settingsReport').innerHTML='';
+  settingsOverlay.classList.add('open');
+}
+function closeSettings(){ settingsOverlay.classList.remove('open'); }
+document.getElementById('settingsBtn').onclick = openSettings;
+document.getElementById('settingsClose').onclick = closeSettings;
+document.getElementById('settingsCancel').onclick = closeSettings;
+settingsOverlay.addEventListener('click', e=>{ if(e.target===settingsOverlay) closeSettings(); });
+
+document.getElementById('useSampleBtn').onclick = ()=>{
+  cfg = Object.assign(defaultCfg(), { usingSample:true }); saveCfg(); closeSettings(); loadData();
+};
+document.getElementById('settingsSave').onclick = ()=>{
+  const rep = document.getElementById('settingsReport');
+  const gRaw = document.getElementById('cfgGpenSheet').value.trim();
+  const sRaw = document.getElementById('cfgStundSheet').value.trim();
+  const gId = gRaw ? extractSheetId(gRaw) : '';
+  const sId = sRaw ? extractSheetId(sRaw) : '';
+  if(gRaw && !gId){ rep.innerHTML = '<span class="bad">Couldn’t find a Sheet ID in the GPen value. Paste the full URL or the long ID.</span>'; return; }
+  if(sRaw && !sId){ rep.innerHTML = '<span class="bad">Couldn’t find a Sheet ID in the Stündenglass value. Paste the full URL or the long ID.</span>'; return; }
+  if(!gId && !sId){ rep.innerHTML = '<span class="bad">Add at least one locator (GPen or Stündenglass).</span>'; return; }
+  cfg.gpen  = { sheetId:gId, tab:(document.getElementById('cfgGpenTab').value.trim()  || 'Sheet1') };
+  cfg.stund = { sheetId:sId, tab:(document.getElementById('cfgStundTab').value.trim() || 'Sheet1') };
+  cfg.totalsTab = document.getElementById('cfgTotalsTab').value.trim() || 'Totals';
+  cfg.usingSample = false;
+  saveCfg(); closeSettings(); loadData();
+};
+
+function showUnplaced(){
+  openSettings();
+  const rows = DATA.unplaced.slice(0,50).map(r=>`<li>${esc(r.name)} — ${esc(r.address||r.city||'(no address)')}</li>`).join('');
+  document.getElementById('settingsReport').innerHTML =
+    `<strong class="bad">${DATA.unplaced.length} row(s) couldn’t be placed</strong> (no recognizable State and none derivable from the address):<ul>${rows}</ul>`;
+}
+
+/* ---------- refresh + export ---------------------------------------------- */
+document.getElementById('refreshBtn').onclick = loadData;
+document.getElementById('exportBtn').onclick = exportCsv;
+function exportCsv(){
+  const rows = DATA.accounts.filter(passes);
+  const head = ['Name','Address','City','State','Type','GPen','Stundenglass','Lat','Lng','Notes'];
+  const q = v => { v = v==null?'':String(v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  const lines = [head.join(',')].concat(rows.map(a=>[
+    a.name,a.address,a.city,NAME_TO_ABBR[a.state.toLowerCase()]||a.state,a.type,
+    a.gpen?'TRUE':'FALSE',a.stundenglass?'TRUE':'FALSE',a.lat??'',a.lng??'',a.notes
+  ].map(q).join(',')));
+  const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const tag = [filter.brand!=='all'?filter.brand:'',filter.type!=='all'?filter.type.replace(/\s+/g,''):''].filter(Boolean).join('-');
+  a.href=url; a.download = 'atlas-usa-accounts'+(tag?'-'+tag:'')+'.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- status line --------------------------------------------------- */
+function setStatus(cls, html){
+  const el = document.getElementById('srcStatus');
+  el.className = 'src-status '+cls;
+  el.innerHTML = html;
+}
+
+/* ---------- util ---------------------------------------------------------- */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---------- boot ---------------------------------------------------------- */
+function boot(){
+  buildMap();
+  loadData();
+  document.getElementById('loading').style.display='none';
+  window.addEventListener('resize', debounce(()=>{ buildMap(); if(selected) recolor(); }, 250));
+}
+function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+boot();
+</script>
+</body>
+</html>
