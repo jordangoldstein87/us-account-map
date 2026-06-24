@@ -416,6 +416,13 @@ const BRANDS = { gpen:'GPen', stundenglass:'Stündenglass' };
 
 const LS_KEY = 'atlas_usa_cfg_v1';
 
+// Built-in default locators so the deployed site loads live data with no per-device setup.
+// (Safe to embed: these sheets are link-shared. Override/add via the ⚙ settings dialog.)
+const DEFAULT_GPEN_SHEET  = '1D55pKj7dA2APYq_dYHmubg2U0lTR89r9HQ8JduiPEcg';
+const DEFAULT_GPEN_TAB    = 'Sheet1';
+const DEFAULT_STUND_SHEET = '';                       // paste the Stündenglass sheet ID here when ready
+const DEFAULT_STUND_TAB   = 'Sheet1';
+
 /* ---------- sample data (renders before a Sheet is connected) ------------- */
 const SAMPLE_ACCOUNTS_CSV = `Name,Address,City,State,Type,GPen,Stundenglass,Lat,Lng,Notes
 Cloud9 Smoke Co,1200 Congress Ave,Austin,TX,Smoke Shop,TRUE,FALSE,30.2711,-97.7437,Flagship
@@ -666,10 +673,10 @@ const tip = document.getElementById('tip');
 // One locator (Google Sheet) per brand. Accounts inherit the brand of the locator
 // they come from; a store appearing in both locators is merged into one (carries both).
 function defaultCfg(){ return {
-  gpen:  { sheetId:'', tab:'Sheet1' },
-  stund: { sheetId:'', tab:'Sheet1' },
+  gpen:  { sheetId:DEFAULT_GPEN_SHEET,  tab:DEFAULT_GPEN_TAB },
+  stund: { sheetId:DEFAULT_STUND_SHEET, tab:DEFAULT_STUND_TAB },
   totalsTab:'Totals',
-  usingSample:true
+  usingSample: !(DEFAULT_GPEN_SHEET || DEFAULT_STUND_SHEET)
 }; }
 function loadCfg(){
   try{
