@@ -535,18 +535,18 @@ function normState(raw){
   if(NAME_TO_ABBR[low]) return ABBR_TO_NAME[NAME_TO_ABBR[low]]; // full name (canonicalized)
   return null;
 }
-// Derive a state from a free-form address: trailing 2-letter code OR spelled-out state name,
-// optionally before a ZIP — e.g. "…, TX 78701", "…, Austin, Texas 78741", "…, New York".
+// Derive a state from a free-form address. Handles a trailing ZIP separated by either a
+// space OR a comma ("…, WA 98122" and "…, WA, 98122"), and a 2-letter code or a spelled-out
+// state name — e.g. "…, TX 78701", "…, Seattle, WA, 98122", "…, Austin, Texas 78741".
 function stateFromAddress(addr){
   if(!addr) return null;
-  const s = String(addr).trim().replace(/,?\s*(USA|United States)\.?\s*$/i,'');  // strip trailing country
-  let m = s.match(/,?\s*([A-Za-z]{2})\s+\d{5}(?:-\d{4})?\s*$/);   // "..., TX 78701"
+  let s = String(addr).trim().replace(/,?\s*(USA|United States)\.?\s*$/i,'');  // strip trailing country
+  s = s.replace(/[,\s]+\d{5}(?:-\d{4})?\.?\s*$/,'').trim();                     // strip trailing ZIP (comma or space before)
+  let m = s.match(/[,\s]([A-Za-z]{2})\s*$/);                                    // trailing 2-letter code ("…, WA")
   if(m && ABBR_TO_NAME[m[1].toUpperCase()]) return ABBR_TO_NAME[m[1].toUpperCase()];
-  m = s.match(/,\s*([A-Za-z][A-Za-z .]+?)\s*(?:\d{5}(?:-\d{4})?)?\s*$/);  // "..., Texas 78741" / "..., New York"
+  m = s.match(/,\s*([A-Za-z][A-Za-z .]+?)\s*$/);                                // trailing full name ("…, New York")
   if(m){ const st = normState(m[1].trim()); if(st) return st; }
-  m = s.match(/,\s*([A-Za-z]{2})\s*$/);                            // "..., TX"
-  if(m && ABBR_TO_NAME[m[1].toUpperCase()]) return ABBR_TO_NAME[m[1].toUpperCase()];
-  // last resort: latest spelled-out state name in the address tail ("…Canutillo Texas 79835")
+  // last resort: latest spelled-out state name in the address tail ("…Canutillo Texas")
   const tail = s.slice(-45).toLowerCase();
   let best=null, bestAt=-1;
   for(const low in NAME_TO_ABBR){
